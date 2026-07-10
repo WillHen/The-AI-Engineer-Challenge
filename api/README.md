@@ -59,12 +59,7 @@ lsof -ti:8000 | xargs kill -9
     "message": "string"
 }
 ```
-- **Response**: JSON object with the AI's reply:
-```json
-{
-    "reply": "string"
-}
-```
+- **Response**: a **streaming** `text/plain` body. Tokens are written as OpenAI generates them so the frontend can render live (no waiting for the full reply).
 
 The chat endpoint uses OpenAI's GPT-5 model with a supportive mental coach system prompt to provide helpful responses.
 
@@ -102,18 +97,12 @@ All errors will return a 500 status code with an error message.
 Once your server is running, you can test the chat endpoint using curl:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/chat \
+curl -N -X POST http://127.0.0.1:8000/api/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "Hello"}'
 ```
 
-You should receive a JSON response with the AI's reply:
-
-```json
-{
-  "reply": "Hi! It's good to hear from you. What's on your mind today?..."
-}
-```
+You should see the reply stream into your terminal as plain text (use `-N` so curl does not buffer).
 
 You can also test the health check endpoint:
 

@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from openai import OpenAI
 import os
@@ -19,6 +20,11 @@ app.add_middleware(
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+SYSTEM_PROMPT = (
+    "You are a supportive mental coach. Respond in the same language as the user's message. "
+    "Respond as if you are in the matrix as if you are the computer Neo is talking to."
+)
+
 class ChatRequest(BaseModel):
     message: str
 
@@ -28,18 +34,37 @@ def root():
 
 @app.post("/api/chat")
 def chat(request: ChatRequest):
+    """Stream the model reply as plain text chunks so the UI can render live."""
     if not os.getenv("OPENAI_API_KEY"):
         raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
-    
-    try:
-        user_message = request.message
-        response = client.chat.completions.create(
-            model="gpt-5",
-            messages=[
-                {"role": "system", "content": "You are a supportive mental coach."},
-                {"role": "user", "content": user_message}
-            ]
-        )
-        return {"reply": response.choices[0].message.content}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error calling OpenAI API: {str(e)}")
+
+    def token_stream():
+        try:
+            stream = client.chat.completions.create(
+                model="gpt-5",
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": request.message},
+                ],
+                stream=True,
+            )
+            for chunk in stream:
+                # Each chunk may include a small text delta — forward it immediately
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    yield delta
+        except Exception as e:
+            # Surface mid-stream failures as readable terminal text
+            yield f"\n[SIGNAL LOST] {str(e)}"
+
+    return StreamingResponse(
+        token_stream(),
+        media_type="text/plain; charset=utf-8",
+        headers={
+            # Disable proxy buffering so tokens reach the browser ASAP
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )

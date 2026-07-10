@@ -8,6 +8,8 @@ type ChatLine = {
   id: string;
   role: Role;
   text: string;
+  /** True while tokens are still arriving for this assistant line */
+  streaming?: boolean;
 };
 
 const API_URL =
@@ -24,7 +26,7 @@ const BOOT_LINES = [
 ];
 
 /**
- * Neo-style terminal chat. Talks to the FastAPI backend at POST /api/chat.
+ * Neo-style terminal chat. Streams tokens from POST /api/chat as they arrive.
  */
 export default function TerminalChat() {
   const [lines, setLines] = useState<ChatLine[]>([]);
@@ -62,17 +64,22 @@ export default function TerminalChat() {
     };
   }, []);
 
-  // Keep the latest line in view as messages stream in
+  // Keep the latest streamed characters in view
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [lines, loading]);
 
-  const appendLine = (role: Role, text: string) => {
-    setLines((prev) => [
-      ...prev,
-      { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, role, text },
-    ]);
+  const appendLine = (role: Role, text: string, streaming = false) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setLines((prev) => [...prev, { id, role, text, streaming }]);
+    return id;
+  };
+
+  const patchLine = (id: string, patch: Partial<ChatLine>) => {
+    setLines((prev) =>
+      prev.map((line) => (line.id === id ? { ...line, ...patch } : line))
+    );
   };
 
   const sendMessage = async (event: FormEvent) => {
@@ -83,6 +90,9 @@ export default function TerminalChat() {
     setInput("");
     appendLine("user", message);
     setLoading(true);
+
+    // Open an empty oracle line immediately so tokens paint as they land
+    const replyId = appendLine("assistant", "", true);
 
     try {
       const response = await fetch(`${API_URL}/api/chat`, {
@@ -96,15 +106,36 @@ export default function TerminalChat() {
         throw new Error(detail || `Request failed (${response.status})`);
       }
 
-      const data = (await response.json()) as { reply?: string };
-      appendLine("assistant", data.reply?.trim() || "[empty reply from the oracle]");
+      if (!response.body) {
+        throw new Error("No response stream from the oracle");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let reply = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        // Append each chunk as soon as the network delivers it
+        reply += decoder.decode(value, { stream: true });
+        patchLine(replyId, { text: reply, streaming: true });
+      }
+
+      // Flush any trailing decoder buffer
+      reply += decoder.decode();
+      const finalText = reply.trim() || "[empty reply from the oracle]";
+      patchLine(replyId, { text: finalText, streaming: false });
     } catch (err) {
       const reason =
         err instanceof Error ? err.message : "Unknown connection failure";
-      appendLine(
-        "error",
-        `CONNECTION SEVERED — ${reason}. Is the backend running at ${API_URL}?`
-      );
+      // Replace the empty streaming line with a system error
+      patchLine(replyId, {
+        role: "error",
+        text: `CONNECTION SEVERED — ${reason}. Is the backend running at ${API_URL}?`,
+        streaming: false,
+      });
     } finally {
       setLoading(false);
       inputRef.current?.focus();
@@ -144,7 +175,7 @@ export default function TerminalChat() {
                   : line.role === "assistant"
                     ? "text-matrix-green"
                     : "text-matrix-green-dim"
-            }`}
+            } ${line.streaming ? "blink-cursor" : ""}`}
             style={{ animationDelay: `${Math.min(i, 8) * 20}ms` }}
           >
             {line.role === "user" && (
@@ -159,10 +190,6 @@ export default function TerminalChat() {
             {line.text}
           </p>
         ))}
-
-        {loading && (
-          <p className="blink-cursor text-matrix-green-dim">ORACLE&gt; decoding signal</p>
-        )}
       </div>
 
       <form

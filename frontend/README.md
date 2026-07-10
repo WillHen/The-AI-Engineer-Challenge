@@ -52,7 +52,7 @@ The terminal posts to:
 ```
 POST {NEXT_PUBLIC_API_URL}/api/chat
 Body: { "message": "your text" }
-Expects: { "reply": "oracle response" }
+Expects: streaming text/plain tokens (rendered live as they arrive)
 ```
 
 ## Scripts
