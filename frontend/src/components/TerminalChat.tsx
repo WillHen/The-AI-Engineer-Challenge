@@ -25,6 +25,10 @@ const BOOT_LINES = [
   "",
 ];
 
+/** How fast the oracle text paints on screen (network can be faster). */
+const TYPEWRITER_MS = 32;
+const CHARS_PER_TICK = 1;
+
 /**
  * Neo-style terminal chat. Streams tokens from POST /api/chat as they arrive.
  */
@@ -112,21 +116,55 @@ export default function TerminalChat() {
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let reply = "";
+
+      // Network fills the buffer ASAP; the typewriter drains it slowly for the UI
+      let buffer = "";
+      let visible = "";
+      let networkDone = false;
+      let revealTimer: number | null = null;
+      let resolveReveal: (() => void) | null = null;
+
+      const drip = () => {
+        if (visible.length < buffer.length) {
+          visible = buffer.slice(0, visible.length + CHARS_PER_TICK);
+          patchLine(replyId, { text: visible, streaming: true });
+          revealTimer = window.setTimeout(drip, TYPEWRITER_MS);
+          return;
+        }
+
+        revealTimer = null;
+
+        // Only finish once the network is done AND every char has been painted
+        if (networkDone) {
+          const finalText = buffer.trim() || "[empty reply from the oracle]";
+          patchLine(replyId, { text: finalText, streaming: false });
+          resolveReveal?.();
+          resolveReveal = null;
+        }
+      };
+
+      const scheduleReveal = () => {
+        if (revealTimer === null) {
+          revealTimer = window.setTimeout(drip, TYPEWRITER_MS);
+        }
+      };
+
+      const revealDone = new Promise<void>((resolve) => {
+        resolveReveal = resolve;
+      });
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        // Append each chunk as soon as the network delivers it
-        reply += decoder.decode(value, { stream: true });
-        patchLine(replyId, { text: reply, streaming: true });
+        buffer += decoder.decode(value, { stream: true });
+        scheduleReveal();
       }
 
-      // Flush any trailing decoder buffer
-      reply += decoder.decode();
-      const finalText = reply.trim() || "[empty reply from the oracle]";
-      patchLine(replyId, { text: finalText, streaming: false });
+      buffer += decoder.decode();
+      networkDone = true;
+      scheduleReveal();
+      await revealDone;
     } catch (err) {
       const reason =
         err instanceof Error ? err.message : "Unknown connection failure";
