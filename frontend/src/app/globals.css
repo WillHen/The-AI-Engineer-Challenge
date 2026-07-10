@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+:root {
+  --matrix-bg: #010301;
+  --matrix-green: #00ff41;
+  --matrix-green-dim: #00b32d;
+  --matrix-green-bright: #7cff9a;
+  --matrix-green-glow: rgba(0, 255, 65, 0.45);
+  --matrix-muted: #1a4d28;
+  --matrix-error: #ff4d4d;
+  --font-terminal: var(--font-share-tech-mono), "Courier New", monospace;
+}
+
+@theme inline {
+  --color-matrix-bg: var(--matrix-bg);
+  --color-matrix-green: var(--matrix-green);
+  --color-matrix-green-dim: var(--matrix-green-dim);
+  --color-matrix-green-bright: var(--matrix-green-bright);
+  --color-matrix-muted: var(--matrix-muted);
+  --color-matrix-error: var(--matrix-error);
+  --font-mono: var(--font-terminal);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: var(--matrix-bg);
+  color: var(--matrix-green);
+  font-family: var(--font-terminal);
+}
+
+/* Soft CRT vignette + scanlines over the whole viewport */
+.crt-overlay {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background:
+    radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.65) 100%),
+    repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.12) 0px,
+      rgba(0, 0, 0, 0.12) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+}
+
+.terminal-glow {
+  text-shadow: 0 0 6px var(--matrix-green-glow), 0 0 18px rgba(0, 255, 65, 0.2);
+}
+
+.blink-cursor::after {
+  content: "█";
+  margin-left: 2px;
+  animation: blink 1s step-end infinite;
+  color: var(--matrix-green);
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes boot-fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.boot-line {
+  animation: boot-fade 0.35s ease-out both;
+}
+
+/* Keep the chat log scrollable without showing a loud scrollbar */
+.terminal-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--matrix-muted) transparent;
+}
+
+.terminal-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.terminal-scroll::-webkit-scrollbar-thumb {
+  background: var(--matrix-muted);
+}
