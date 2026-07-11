@@ -55,13 +55,23 @@ Body: { "message": "your text" }
 Expects: streaming text/plain tokens (rendered live as they arrive)
 ```
 
+Locally, set `NEXT_PUBLIC_API_URL=http://localhost:8000` in `.env.local`.  
+On Vercel, leave it unset — the UI calls same-origin `/api/chat` next to the FastAPI function.
+
+## Deploy (Vercel)
+
+From the repo root, `vercel.json` builds this app into `/public` and keeps `/api/*` on FastAPI. Redeploy with:
+
+```bash
+vercel --prod
+```
+
 ## Scripts
 
 | Command        | What it does              |
 | -------------- | ------------------------- |
 | `npm run dev`  | Local dev server (port 3000) |
-| `npm run build`| Production build          |
-| `npm run start`| Serve the production build |
+| `npm run build`| Static export to `out/`   |
 | `npm run lint` | ESLint                    |
 
 ## Vibe check

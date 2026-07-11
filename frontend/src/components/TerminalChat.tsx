@@ -12,8 +12,8 @@ type ChatLine = {
   streaming?: boolean;
 };
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:8000";
+// Empty in production (same-origin /api/chat). Local .env.local points at localhost:8000.
+const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
 const BOOT_LINES = [
   "WAKE UP, NEO...",
