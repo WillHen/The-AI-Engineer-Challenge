@@ -18,7 +18,17 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = None
+
+def get_openai_client() -> OpenAI:
+    """Create the OpenAI client on demand so missing env vars don't crash import."""
+    global client
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
+    if client is None:
+        client = OpenAI(api_key=api_key)
+    return client
 
 SYSTEM_PROMPT = (
     "You are a supportive mental coach. Respond in the same language as the user's message. "
@@ -35,12 +45,11 @@ def root():
 @app.post("/api/chat")
 def chat(request: ChatRequest):
     """Stream the model reply as plain text chunks so the UI can render live."""
-    if not os.getenv("OPENAI_API_KEY"):
-        raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
+    openai_client = get_openai_client()
 
     def token_stream():
         try:
-            stream = client.chat.completions.create(
+            stream = openai_client.chat.completions.create(
                 model="gpt-5",
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
