@@ -166,3 +166,4 @@ cython_debug/
 
 # Generated Matrix UI for Vercel (built from frontend/ during deploy)
 /public/
+/api/static/

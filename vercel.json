@@ -1,10 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd frontend && npm ci && npm run build && rm -rf ../public && mkdir -p ../public && cp -R out/* ../public/",
+  "buildCommand": "cd frontend && npm ci && npm run build && rm -rf ../api/static && mkdir -p ../api/static && cp -R out/* ../api/static/",
   "functions": {
     "api/index.py": {
-      "maxDuration": 60,
-      "includeFiles": "public/**"
+      "maxDuration": 60
     }
   }
 }

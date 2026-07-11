@@ -23,8 +23,8 @@ app.add_middleware(
 
 client = None
 
-# Built Matrix UI lands here during the Vercel build (see vercel.json)
-PUBLIC_DIR = Path(__file__).resolve().parent.parent / "public"
+# Vercel build copies the Next export here so it ships inside the Python function
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 def get_openai_client() -> OpenAI:
     """Create the OpenAI client on demand so missing env vars don't crash import."""
@@ -87,11 +87,11 @@ def chat(request: ChatRequest):
 @app.get("/")
 def root():
     """Serve the Matrix terminal UI when the static export is present."""
-    index = PUBLIC_DIR / "index.html"
+    index = STATIC_DIR / "index.html"
     if index.is_file():
         return FileResponse(index)
     return {"status": "ok", "detail": "frontend not built yet"}
 
 # Next.js assets (/_next/*, favicon, etc.) — registered after API routes
-if PUBLIC_DIR.is_dir():
-    app.mount("/", StaticFiles(directory=str(PUBLIC_DIR), html=True), name="frontend")
+if STATIC_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="frontend")
