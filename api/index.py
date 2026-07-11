@@ -1,6 +1,9 @@
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from openai import OpenAI
 import os
@@ -10,7 +13,7 @@ load_dotenv()
 
 app = FastAPI()
 
-# CORS so the frontend can talk to backend
+# CORS so the frontend can talk to backend (local dev + cross-origin previews)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,6 +22,9 @@ app.add_middleware(
 )
 
 client = None
+
+# Built Matrix UI lands here during the Vercel build (see vercel.json)
+PUBLIC_DIR = Path(__file__).resolve().parent.parent / "public"
 
 def get_openai_client() -> OpenAI:
     """Create the OpenAI client on demand so missing env vars don't crash import."""
@@ -38,8 +44,8 @@ SYSTEM_PROMPT = (
 class ChatRequest(BaseModel):
     message: str
 
-@app.get("/")
-def root():
+@app.get("/api/health")
+def health():
     return {"status": "ok"}
 
 @app.post("/api/chat")
@@ -77,3 +83,15 @@ def chat(request: ChatRequest):
             "X-Accel-Buffering": "no",
         },
     )
+
+@app.get("/")
+def root():
+    """Serve the Matrix terminal UI when the static export is present."""
+    index = PUBLIC_DIR / "index.html"
+    if index.is_file():
+        return FileResponse(index)
+    return {"status": "ok", "detail": "frontend not built yet"}
+
+# Next.js assets (/_next/*, favicon, etc.) — registered after API routes
+if PUBLIC_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=str(PUBLIC_DIR), html=True), name="frontend")

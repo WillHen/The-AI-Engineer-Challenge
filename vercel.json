@@ -3,13 +3,8 @@
   "buildCommand": "cd frontend && npm ci && npm run build && rm -rf ../public && mkdir -p ../public && cp -R out/* ../public/",
   "functions": {
     "api/index.py": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "public/**"
     }
-  },
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/index.py"
-    }
-  ]
+  }
 }
